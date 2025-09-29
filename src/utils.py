@@ -58,37 +58,58 @@ def visualize_data(df) :
 
 
 #---------------------------------------------------------------------------------------------------------------------------------
-
-def generate_testcase(csv_path: str):
-    """
-    Generate a fake row (testcase) based on the schema of the dataset.
-    Assumes the last column is the target (label).
-    """
+'''
+def generate_testcase(csv_path):
     df = pd.read_csv(csv_path)
 
-    # Drop target column if exists (last one)
-    features = df.iloc[:, :-1]  
+    # Drop target column if exists
+    target_col = "label"  # <-- replace with your actual target
+    if target_col in df.columns:
+        features = df.drop(columns=[target_col])
+    else:
+        features = df
 
-    testcase = []
+    # Pick one row (or synthesize)
+    row = features.sample(1, random_state=42).iloc[0]
+
+    # Force numeric
+    #row = pd.to_numeric(row, errors="coerce").fillna(0)
+
+    return row.to_numpy().flatten()
+
+def generate_testcase(csv_path):
+    df = pd.read_csv(csv_path)
+
+    target_col = "label"  # <-- replace with your target column name
+    if target_col in df.columns:
+        features = df.drop(columns=[target_col])
+    else:
+        features = df
+
+    # Sample a single row (keep as DataFrame, not Series)
+    row = features.sample(1, random_state=random.randint(0, 1000))
+
+    # Return it as dictionary (preserves column names and types)
+    return row.to_dict(orient="records")[0]
+'''
+
+def generate_testcase(csv_path):
+    df = pd.read_csv(csv_path)
+
+    target_col = "label"  
+    if target_col in df.columns:
+        features = df.drop(columns=[target_col])
+    else:
+        features = df
+
+    features = features.select_dtypes(include=[np.number])
+
+    testcase = {}
     for col in features.columns:
-        if pd.api.types.is_numeric_dtype(features[col]):
-            # numeric column → random value in min-max range
-            min_val, max_val = features[col].min(), features[col].max()
-            val = random.uniform(min_val, max_val)
-            testcase.append(val)
-
-        elif pd.api.types.is_categorical_dtype(features[col]) or features[col].dtype == object:
-            # categorical column → pick random category
-            val = random.choice(features[col].dropna().unique().tolist())
-            testcase.append(val)
-
-        elif pd.api.types.is_bool_dtype(features[col]):
-            # boolean column → True/False
-            val = random.choice([True, False])
-            testcase.append(val)
-
-        else:
-            # fallback: string placeholder
-            testcase.append("test_value")
+        mean = features[col].mean()
+        std = features[col].std()
+        if pd.isna(std) or std == 0:
+            std = 1  
+        testcase[col] = float(np.random.normal(mean, std))
 
     return testcase
